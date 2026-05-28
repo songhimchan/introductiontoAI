@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Database
+local_shop.db
+*.sqlite3
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Logs
+process_log.txt
+*.log

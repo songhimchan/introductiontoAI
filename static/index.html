@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text-to-SQL 시각화 프로토타입</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8 text-gray-800">
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- Header -->
+        <header class="text-center space-y-2">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">데이터 탐색 프로토타입</h1>
+            <p class="text-gray-500">자연어로 질문하고 즉시 데이터 시각화를 확인하세요.</p>
+        </header>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            <!-- Sidebar for DB Schema -->
+            <div class="xl:col-span-1 space-y-4">
+                <div class="glass-panel rounded-2xl p-6 h-full">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="p-1.5 bg-green-100 text-green-600 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                        </span>
+                        DB 테이블 구조
+                    </h2>
+                    <div id="schemaContainer" class="space-y-4 text-sm text-gray-700">
+                        <!-- Schema will be injected here -->
+                        <div class="text-gray-400">불러오는 중...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="xl:col-span-3 space-y-8">
+                <!-- Search Bar -->
+                <section class="glass-panel rounded-2xl p-6 transition-all duration-300 hover:shadow-lg">
+                    <form id="askForm" class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="questionInput" 
+                            class="flex-1 px-6 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg transition-all"
+                            placeholder="예: 2023년 총 매출은 얼마인가요? / 제품별 재고량을 보여줘" required autocomplete="off">
+                        <button type="submit" id="submitBtn"
+                            class="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2">
+                            <span class="whitespace-nowrap">질문하기</span>
+                            <svg class="w-5 h-5 hidden" id="loadingSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </form>
+                </section>
+
+                <!-- Error Message -->
+                <div id="errorBox" class="hidden glass-panel border-l-4 border-red-500 rounded-xl p-4 text-red-700 text-sm"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 hidden" id="resultsSection">
+                    
+                    <!-- Left Column: SQL & Table -->
+                    <div class="space-y-8">
+                        
+                        <!-- SQL Query -->
+                        <div class="glass-panel rounded-2xl p-6">
+                            <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                                <span class="p-1.5 bg-blue-100 text-blue-600 rounded-lg">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                                </span>
+                                생성된 SQL 쿼리
+                            </h2>
+                            <div class="bg-gray-900 rounded-xl p-4 overflow-x-auto">
+                                <code id="sqlCode" class="text-green-400 font-mono text-sm whitespace-pre-wrap"></code>
+                            </div>
+                        </div>
+
+                        <!-- Data Table -->
+                        <div class="glass-panel rounded-2xl p-6 overflow-hidden">
+                            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <span class="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                </span>
+                                원본 데이터
+                            </h2>
+                            <div class="overflow-x-auto max-h-96">
+                                <table class="w-full text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                                        <tr id="tableHead"></tr>
+                                    </thead>
+                                    <tbody id="tableBody" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Chart -->
+                    <div class="h-full">
+                        <div class="glass-panel rounded-2xl p-6 h-full flex flex-col min-h-[400px]">
+                            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <span class="p-1.5 bg-purple-100 text-purple-600 rounded-lg">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                                </span>
+                                데이터 시각화
+                            </h2>
+                            <div class="flex-1 relative w-full h-full flex items-center justify-center">
+                                <canvas id="myChart" class="w-full h-full"></canvas>
+                                <p id="chartFallback" class="text-sm text-gray-400 absolute text-center hidden">차트로 시각화하기에 적합한 데이터가 없습니다.<br/>(문자열과 숫자형 컬럼이 1개 이상 필요)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+
+        // Fetch DB Schema on load
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (window.location.protocol === 'file:') {
+                    throw new Error("파일을 브라우저에서 직접 열었습니다.\n터미널에서 uvicorn main:app 을 실행하고 http://127.0.0.1:8000 으로 접속해주세요.");
+                }
+
+                const res = await fetch('/schema');
+                if (!res.ok) {
+                    throw new Error(`스키마를 불러오는 데 실패했습니다 (HTTP ${res.status}).`);
+                }
+                const schema = await res.json();
+                
+                const container = document.getElementById('schemaContainer');
+                container.innerHTML = '';
+                
+                for (const [table, columns] of Object.entries(schema)) {
+                    const box = document.createElement('div');
+                    box.className = 'bg-gray-50 rounded-lg p-3 border border-gray-100 shadow-sm';
+                    
+                    const title = document.createElement('h3');
+                    title.className = 'font-bold text-indigo-700 mb-2 border-b border-gray-200 pb-1';
+                    title.textContent = table;
+                    box.appendChild(title);
+
+                    const ul = document.createElement('ul');
+                    ul.className = 'space-y-1';
+                    columns.forEach(col => {
+                        const li = document.createElement('li');
+                        li.className = 'flex justify-between items-center text-xs';
+                        li.innerHTML = `<span class="font-medium text-gray-800">${col.name}</span> <span class="text-gray-400">${col.type}</span>`;
+                        ul.appendChild(li);
+                    });
+                    
+                    box.appendChild(ul);
+                    container.appendChild(box);
+                }
+            } catch (e) {
+                document.getElementById('schemaContainer').innerHTML = `<div class="text-red-500 text-sm whitespace-pre-wrap">${e.message || '스키마를 불러오는 데 실패했습니다.'}</div>`;
+            }
+        });
+
+        document.getElementById('askForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const question = document.getElementById('questionInput').value;
+            if (!question.trim()) return;
+
+            const btn = document.getElementById('submitBtn');
+            const spinner = document.getElementById('loadingSpinner');
+            const resultsSection = document.getElementById('resultsSection');
+            const errorBox = document.getElementById('errorBox');
+            
+            // Loading state
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            errorBox.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || '오류가 발생했습니다.');
+                }
+
+                displayResults(data);
+
+            } catch (err) {
+                errorBox.textContent = err.message;
+                errorBox.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.classList.remove('hidden');
+
+            // Set SQL
+            document.getElementById('sqlCode').textContent = data.query;
+
+            // Set Table
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (data.columns && data.columns.length > 0) {
+                data.columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-3 font-medium';
+                    th.textContent = col;
+                    thead.appendChild(th);
+                });
+
+                data.data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition-colors';
+                    data.columns.forEach(col => {
+                        const td = document.createElement('td');
+                        td.className = 'px-4 py-3 text-gray-700';
+                        td.textContent = row[col];
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            } else {
+                thead.innerHTML = '<th class="px-4 py-3 text-gray-500">반환된 데이터가 없습니다.</th>';
+            }
+
+            // Draw Chart
+            drawChart(data);
+        }
+
+        function drawChart(data) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            const fallback = document.getElementById('chartFallback');
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            let labelCol = null;
+            let dataCol = null;
+
+            if (data.data.length > 0 && data.columns.length >= 2) {
+                const firstRow = data.data[0];
+                for (let col of data.columns) {
+                    if (typeof firstRow[col] === 'number') {
+                        dataCol = col;
+                    } else if (typeof firstRow[col] === 'string' || typeof firstRow[col] === 'object') {
+                        labelCol = col;
+                    }
+                }
+            }
+
+            if ((!labelCol || !dataCol) && data.columns.length >= 2) {
+                labelCol = data.columns[0];
+                dataCol = data.columns[1];
+            }
+
+            if (labelCol && dataCol && data.data.length > 0) {
+                document.getElementById('myChart').style.display = 'block';
+                fallback.classList.add('hidden');
+
+                const labels = data.data.map(row => String(row[labelCol]));
+                const values = data.data.map(row => Number(row[dataCol]) || 0);
+
+                const chartType = labels.length <= 15 ? 'bar' : 'line';
+                
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)'); 
+                gradient.addColorStop(1, 'rgba(59, 130, 246, 0.8)'); 
+
+                chartInstance = new Chart(ctx, {
+                    type: chartType,
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: dataCol,
+                            data: values,
+                            backgroundColor: gradient,
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.05)' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { maxRotation: 45, minRotation: 45 }
+                            }
+                        }
+                    }
+                });
+            } else {
+                document.getElementById('myChart').style.display = 'none';
+                fallback.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
