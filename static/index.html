@@ -41,8 +41,8 @@
         
         <!-- Header -->
         <header class="text-center space-y-2">
-            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">데이터 탐색 프로토타입</h1>
-            <p class="text-gray-500">자연어로 질문하고 즉시 데이터 시각화를 확인하세요.</p>
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">데이터 CRUD 프로토타입</h1>
+            <p class="text-gray-500">자연어로 데이터를 탐색하고 생성, 수정, 삭제(CRUD) 작업을 수행하세요.</p>
         </header>
 
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
@@ -69,7 +69,7 @@
                     <form id="askForm" class="flex flex-col sm:flex-row gap-4">
                         <input type="text" id="questionInput" 
                             class="flex-1 px-6 py-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg transition-all"
-                            placeholder="예: 2023년 총 매출은 얼마인가요? / 제품별 재고량을 보여줘" required autocomplete="off">
+                            placeholder="예: 2023년 총 매출은? / 새로운 상품을 추가해줘 / 홍길동 고객을 삭제해줘" required autocomplete="off">
                         <button type="submit" id="submitBtn"
                             class="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2">
                             <span class="whitespace-nowrap">질문하기</span>
@@ -132,7 +132,7 @@
                             </h2>
                             <div class="flex-1 relative w-full h-full flex items-center justify-center">
                                 <canvas id="myChart" class="w-full h-full"></canvas>
-                                <p id="chartFallback" class="text-sm text-gray-400 absolute text-center hidden">차트로 시각화하기에 적합한 데이터가 없습니다.<br/>(문자열과 숫자형 컬럼이 1개 이상 필요)</p>
+                                <p id="chartFallback" class="text-sm text-gray-400 absolute text-center hidden">차트로 시각화하기에 적합한 데이터가 없습니다.<br/>(또는 데이터 생성/수정/삭제 요청이 완료되었습니다.)</p>
                             </div>
                         </div>
                     </div>

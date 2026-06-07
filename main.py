@@ -45,11 +45,12 @@ def get_db_schema():
     return schema
 
 def is_safe_query(query: str) -> bool:
-    # Basic safety check: only allow SELECT queries, forbid modifying operations
+    # Basic safety check: allow SELECT, INSERT, UPDATE, DELETE queries
     q = query.upper().strip()
-    if not q.startswith("SELECT"):
+    allowed_starts = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+    if not any(q.startswith(start) for start in allowed_starts):
         return False
-    forbidden = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "EXEC", "TRUNCATE"]
+    forbidden = ["DROP", "ALTER", "CREATE", "EXEC", "TRUNCATE"]
     for word in forbidden:
         if re.search(r'\b' + word + r'\b', q):
             return False
@@ -89,14 +90,15 @@ def ask_question(req: QueryRequest):
     
     prompt = f"""
 You are an expert SQL assistant. Given the following SQLite database schema, 
-translate the user's natural language question into a valid SQL query.
+translate the user's natural language request into a valid SQL query.
 Return ONLY the raw SQL query, with no markdown formatting, no explanation, and no backticks.
-The query must be a valid SQLite SELECT statement.
+The query can be a SELECT, INSERT, UPDATE, or DELETE statement depending on the user's request.
+IMPORTANT: For UPDATE and DELETE, make sure the WHERE clause is as specific as possible to avoid accidentally modifying/deleting unintended rows.
 
 Schema:
 {schema}
 
-Question: {req.question}
+Request: {req.question}
 """
     
     try:
@@ -114,20 +116,24 @@ Question: {req.question}
         sql_query = sql_query.strip()
 
         if not is_safe_query(sql_query):
-            raise HTTPException(status_code=400, detail="Generated query is not a safe SELECT statement.")
+            raise HTTPException(status_code=400, detail="Generated query is not a safe statement. (Only SELECT, INSERT, UPDATE, DELETE are allowed)")
         
         conn = sqlite3.connect('local_shop.db')
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
+        c.execute("PRAGMA foreign_keys = ON;")
         c.execute(sql_query)
-        rows = c.fetchall()
         
-        # Get column names
-        columns = [description[0] for description in c.description] if c.description else []
-        
-        results = []
-        for row in rows:
-            results.append(dict(row))
+        q_upper = sql_query.upper().strip()
+        if q_upper.startswith("SELECT"):
+            rows = c.fetchall()
+            columns = [description[0] for description in c.description] if c.description else []
+            results = [dict(row) for row in rows]
+        else:
+            conn.commit()
+            affected = c.rowcount
+            columns = ["결과", "반영된 행 수"]
+            results = [{"결과": "성공", "반영된 행 수": affected}]
             
         conn.close()
         
@@ -137,6 +143,10 @@ Question: {req.question}
             "data": results
         }
         
+    except sqlite3.IntegrityError as e:
+        with open("process_log.txt", "a", encoding="utf-8") as f:
+            f.write(f"[IntegrityError] /ask endpoint: {str(e)}\n")
+        raise HTTPException(status_code=400, detail=f"데이터 무결성 오류 (예: 사용 중인 데이터 삭제 불가, 고유값 중복 등): {str(e)}")
     except Exception as e:
         # Log to process_log.txt for demonstration
         with open("process_log.txt", "a", encoding="utf-8") as f:
